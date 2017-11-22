@@ -7,7 +7,7 @@ library(VIM)
 #----------------------------------------------------------------------------------------
 
 
-imp <- read_csv("sample_impressions58dd0bc0bae81f0013d47d411510679198069.csv")
+imp <- read_csv("sample_impressions.csv")
 glimpse(imp)  # All characters, except for:
 # X1, ad, age, backendStatus, bidPrice, campaign, day, 
 # deviceType, elbStatus, price, targetGroup, timestamp (dttm)
@@ -132,7 +132,7 @@ count(imp, venueType) %>% mutate(percent = n/nrow(imp)*100) %>%
 # Read in impressions:
 #----------------------------------------------------------------------------------------
 
-bids <- read_csv("sample_bid_requests58dd0bc0bae81f0013d47d411510679179543.csv")
+bids <- read_csv("sample_bid_requests.csv")
 dim(bids)  # 10,406 by 77
 glimpse(bids)
 
@@ -280,7 +280,7 @@ bids$timestamp
 # Read in clicks:
 #----------------------------------------------------------------------------------------
 
-cl <- read_csv("sample_clicks58dd0bc0bae81f0013d47d411510679211434.csv")
+cl <- read_csv("sample_clicks.csv")
 dim(cl)  # 48,729 by 33
 glimpse(cl)
 
@@ -306,6 +306,13 @@ View(count(cl, ad) %>% mutate(percent = n/nrow(cl)*100) %>%
   arrange(-percent))
 View(count(cl, bestVenueName) %>% mutate(percent = n/nrow(cl)*100) %>% 
        arrange(-percent))
+View(count(cl, carrier) %>% mutate(percent = n/nrow(cl)*100) %>% 
+       arrange(-percent))
+
+View(count(cl, deviceName) %>% mutate(percent = n/nrow(cl)*100) %>% 
+  arrange(-percent))
+View(count(cl, deviceName) %>% mutate(percent = n/nrow(cl)*100) %>% 
+       arrange(deviceName))
 
 count(cl, adType) %>% mutate(percent = n/nrow(cl)*100) %>% 
   arrange(-percent)
@@ -345,4 +352,324 @@ View(count(cl, state) %>% mutate(percent = n/nrow(cl)*100) %>%
        arrange(-percent))
 
 
+count(cl, bidPrice) %>% mutate(percent = n/nrow(cl)*100) %>% 
+  arrange(-percent)
+
+
 dim(cl)
+
+#------------------------------------------------------------------------------------
+# Can we find a combination of variables that creates a unique identifier
+# for impressions (imp) and clicks (cl)
+#------------------------------------------------------------------------------------
+
+# Columns present in both impressions and clicks files and have no NAs:
+# ad, adSize, adType, bestVenueName, bidPrice, campaign, country, day,
+# deviceType, dimensions
+# 
+
+nrow(imp)  # 22,806
+imp <-  imp %>% unite(forID, ad, dimensions, remove = F)
+names(imp)
+View(select(imp, ad, dimensions, forID)[1:20,])
+n_distinct(imp$ad)         # 1,004
+n_distinct(imp$dimensions) # 15,180
+n_distinct(imp$bidPrice)   # 65
+n_distinct(imp$campaign)   # 150
+n_distinct(imp$day)   # 2
+n_distinct(imp$bestVenueName)   # 1,836
+
+n_distinct(imp$forID)      # 15,180 (if based only on ad & dimensions)
+
+imp <-  imp %>% unite(forID, bidPrice, dimensions, remove = F)
+n_distinct(imp$forID)      # 15,180 (if based only on bidPrice & dimensions)
+
+imp <-  imp %>% unite(forID, ad, bidPrice, remove = F)
+n_distinct(imp$forID)      # 15,180 (if based only on ad & bidPrice)
+
+# Combining 2 variables only:
+
+mygrid <- expand.grid(c("ad", "bidPrice", "campaign", "day", "dimensions", "bestVenueName"), 
+                      c("ad", "bidPrice", "campaign", "day", "dimensions", "bestVenueName"),
+                      stringsAsFactors = F)
+mygrid <- filter(mygrid, !(Var1 == Var2))
+mygrid$LevelNumber <- NA
+for (i in 1:nrow(mygrid)) {
+  temp <- paste(imp[[mygrid$Var1[i]]], imp[[mygrid$Var2[i]]],sep = '_')
+  mygrid$LevelNumber[i] <- n_distinct(temp)
+}
+max(mygrid$LevelNumber)  # 15,180
+
+# Combining 3 variables:
+
+mygrid <- expand.grid(c("ad", "bidPrice", "campaign", "day", "dimensions", "bestVenueName"),
+                      c("ad", "bidPrice", "campaign", "day", "dimensions", "bestVenueName"),
+                      c("ad", "bidPrice", "campaign", "day", "dimensions", "bestVenueName"),
+                      stringsAsFactors = F)
+mygrid <- filter(mygrid, !(Var1 == Var2))
+mygrid <- filter(mygrid, !(Var1 == Var3))
+mygrid <- filter(mygrid, !(Var2 == Var3))
+
+mygrid$LevelNumber <- NA
+for (i in 1:nrow(mygrid)) {
+  temp <- paste(imp[[mygrid$Var1[i]]], imp[[mygrid$Var2[i]]], imp[[mygrid$Var3[i]]], sep = '_')
+  mygrid$LevelNumber[i] <- n_distinct(temp)
+}
+max(mygrid$LevelNumber)  # 15,180
+
+# Combining 4 variables:
+mygrid <- expand.grid(c("ad", "bidPrice", "campaign", "day", "dimensions", "bestVenueName"),
+                      c("ad", "bidPrice", "campaign", "day", "dimensions", "bestVenueName"),
+                      c("ad", "bidPrice", "campaign", "day", "dimensions", "bestVenueName"),
+                      c("ad", "bidPrice", "campaign", "day", "dimensions", "bestVenueName"),
+                      stringsAsFactors = F)
+dim(mygrid)
+mygrid <- filter(mygrid, !(Var1 == Var2))
+mygrid <- filter(mygrid, !(Var1 == Var3))
+mygrid <- filter(mygrid, !(Var1 == Var4))
+mygrid <- filter(mygrid, !(Var2 == Var3))
+mygrid <- filter(mygrid, !(Var2 == Var4))
+mygrid <- filter(mygrid, !(Var3 == Var4))
+dim(mygrid)
+
+mygrid$LevelNumber <- NA
+for (i in 1:nrow(mygrid)) {
+  temp <- paste(imp[[mygrid$Var1[i]]], imp[[mygrid$Var2[i]]], 
+                imp[[mygrid$Var3[i]]], imp[[mygrid$Var4[i]]], sep = '_')
+  mygrid$LevelNumber[i] <- n_distinct(temp)
+}
+max(mygrid$LevelNumber)  # 15,180
+
+# # Most frequent value of dimensions:
+dim_frequent <- count(imp, dimensions) %>% arrange(-n) 
+dim_frequent <- dim_frequent$dimensions[1]
+sum(imp$dimensions %in% dim_frequent)
+
+temp <- imp %>% filter(dimensions == dim_frequent) %>% 
+  select(ad, adSize, adType, bidPrice, campaign, country, day, deviceType)
+View(temp)
+
+write.csv(imp[imp$dimensions == dim_frequent,], "x temp.csv", row.names = F)
+
+##-------------------------------------------------------------------------------------------------------
+## No, there are no unique combinations - some rows are identical!
+
+######################################################################################
+## Removing duplicate rows
+ 
+dim(imp)  # 22,806
+imp <- imp[-1]
+imp <- unique(imp)
+dim(imp)  # 15,208 by 33
+names(imp)
+
+# Combining 2 variables only:
+
+mygrid <- expand.grid(c("ad", "bidPrice", "campaign", "day", "dimensions", "bestVenueName"), 
+                      c("ad", "bidPrice", "campaign", "day", "dimensions", "bestVenueName"),
+                      stringsAsFactors = F)
+mygrid <- filter(mygrid, !(Var1 == Var2))
+mygrid$LevelNumber <- NA
+for (i in 1:nrow(mygrid)) {
+  temp <- paste(imp[[mygrid$Var1[i]]], imp[[mygrid$Var2[i]]],sep = '_')
+  mygrid$LevelNumber[i] <- n_distinct(temp)
+}
+max(mygrid$LevelNumber)  # 15,180 - still < 15,208
+
+
+# Combining 3 variables:
+
+mygrid <- expand.grid(c("ad", "bidPrice", "campaign", "day", "dimensions", "bestVenueName"),
+                      c("ad", "bidPrice", "campaign", "day", "dimensions", "bestVenueName"),
+                      c("ad", "bidPrice", "campaign", "day", "dimensions", "bestVenueName"),
+                      stringsAsFactors = F)
+mygrid <- filter(mygrid, !(Var1 == Var2))
+mygrid <- filter(mygrid, !(Var1 == Var3))
+mygrid <- filter(mygrid, !(Var2 == Var3))
+
+mygrid$LevelNumber <- NA
+for (i in 1:nrow(mygrid)) {
+  temp <- paste(imp[[mygrid$Var1[i]]], imp[[mygrid$Var2[i]]], imp[[mygrid$Var3[i]]], sep = '_')
+  mygrid$LevelNumber[i] <- n_distinct(temp)
+}
+max(mygrid$LevelNumber)  # 15,180 - still < 15,208
+
+# # Most frequent value of dimensions:
+dim_frequent <- count(imp, dimensions) %>% arrange(-n) 
+View(dim_frequent)
+dim_frequent <- dim_frequent$dimensions[1]
+sum(imp$dimensions %in% dim_frequent)
+
+write.csv(imp[imp$dimensions == dim_frequent,], "x temp.csv", row.names = F)
+
+# Looking at rows with double entries:
+dim_frequent <- count(imp, dimensions) %>% arrange(-n) %>% 
+  filter(n > 1) %>% select(dimensions) %>% unlist()
+View(dim_frequent)
+
+write.csv(imp[imp$dimensions %in% dim_frequent,], "x temp.csv", row.names = F)
+
+######################################################################################
+# Further deduping - this time ignoring the timestamp
+# (just to see if we get this way at the unique identifyer)
+names(imp)
+dim(imp) # 33 columns
+imp <- imp %>% select(-timestamp)
+dim(imp) # 15,208 by 32 columns
+imp <- unique(imp)
+dim(imp)  # 15,187 by 32
+names(imp)
+
+
+# Combining 2 variables only:
+
+mygrid <- expand.grid(c("ad", "bidPrice", "campaign", "day", "dimensions", "bestVenueName"), 
+                      c("ad", "bidPrice", "campaign", "day", "dimensions", "bestVenueName"),
+                      stringsAsFactors = F)
+mygrid <- filter(mygrid, !(Var1 == Var2))
+mygrid$LevelNumber <- NA
+for (i in 1:nrow(mygrid)) {
+  temp <- paste(imp[[mygrid$Var1[i]]], imp[[mygrid$Var2[i]]],sep = '_')
+  mygrid$LevelNumber[i] <- n_distinct(temp)
+}
+max(mygrid$LevelNumber)  # 15,180 - still < 15,187
+
+
+# Combining 3 variables:
+
+mygrid <- expand.grid(c("ad", "bidPrice", "campaign", "day", "dimensions", "bestVenueName"),
+                      c("ad", "bidPrice", "campaign", "day", "dimensions", "bestVenueName"),
+                      c("ad", "bidPrice", "campaign", "day", "dimensions", "bestVenueName"),
+                      stringsAsFactors = F)
+mygrid <- filter(mygrid, !(Var1 == Var2))
+mygrid <- filter(mygrid, !(Var1 == Var3))
+mygrid <- filter(mygrid, !(Var2 == Var3))
+
+mygrid$LevelNumber <- NA
+for (i in 1:nrow(mygrid)) {
+  temp <- paste(imp[[mygrid$Var1[i]]], imp[[mygrid$Var2[i]]], imp[[mygrid$Var3[i]]], sep = '_')
+  mygrid$LevelNumber[i] <- n_distinct(temp)
+}
+max(mygrid$LevelNumber)  # 15,180 - still < 15,187
+
+# # Most frequent value of dimensions:
+dim_frequent <- count(imp, dimensions) %>% arrange(-n)
+View(dim_frequent)
+dim_frequent <- dim_frequent$dimensions[1]
+sum(imp$dimensions %in% dim_frequent)
+
+# Looking at rows with double entries:
+dim_frequent <- count(imp, dimensions) %>% arrange(-n) %>% 
+  filter(n > 1) %>% select(dimensions) %>% unlist()
+write.csv(imp[imp$dimensions %in% dim_frequent,], "x temp.csv", row.names = F)
+
+# Now, only auctionId results in duplicates - let's take it out and dedupe:
+# names(imp)
+dim(imp) # 32 columns
+imp <- imp %>% select(-auctionId)
+dim(imp) # 15,187 by 31 columns
+imp <- unique(imp)
+dim(imp)  # 15,181 by 31
+names(imp)
+
+# To achive uniqueness, I removed:
+# Unnamed column, timestamp, auctionId
+# we can't find unique IDs based on columns in-common with click data file because the final prices
+# are sometimes different (for those 2 ads that are shown at the same time (or almost the same) and sold on the same or
+# different auctions and show exactly the same ads, but are sold separately - as a result, they either:
+# have the same timestamp, but are purchased on different aucionts,
+# or they have different timestaps (within seconds from each other), but are bought on the same auction
+
+# When we use price (instead of bid price - we get unique combinations)
+
+mygrid <- expand.grid(c("ad", "bidPrice", "price", "campaign", "day", "dimensions", "bestVenueName"), 
+                      c("ad", "bidPrice", "price", "campaign", "day", "dimensions", "bestVenueName"),
+                      stringsAsFactors = F)
+mygrid <- filter(mygrid, !(Var1 == Var2))
+mygrid$LevelNumber <- NA
+for (i in 1:nrow(mygrid)) {
+  temp <- paste(imp[[mygrid$Var1[i]]], imp[[mygrid$Var2[i]]],sep = '_')
+  mygrid$LevelNumber[i] <- n_distinct(temp)
+}
+max(mygrid$LevelNumber)  # 15,181 = 15,181 - it's price + dimensions that gives us the final unique identifier
+
+# Looking at rows with double entries:
+dim_frequent <- count(imp, bestVenueName, dimensions) %>% arrange(-n) %>% 
+  filter(n > 1) %>% select(bestVenueName, dimensions) # %>% unlist()
+View(dim_frequent)
+write.csv(imp[imp$dimensions %in% dim_frequent$dimensions,], "x temp.csv", row.names = F)
+
+
+####################################################################################
+# For clicks:
+ 
+dim(cl) # 48,729 by 33
+mygrid <- expand.grid(c("ad", "bidPrice", "campaign", "day", "dimensions", "bestVenueName"), 
+                      c("ad", "bidPrice", "campaign", "day", "dimensions", "bestVenueName"), stringsAsFactors = F)
+mygrid <- filter(mygrid, !(Var1 == Var2))
+mygrid$LevelNumber <- NA
+for (i in 1:nrow(mygrid)) {
+  temp <- paste(cl[[mygrid$Var1[i]]], cl[[mygrid$Var2[i]]],sep = '_')
+  mygrid$LevelNumber[i] <- n_distinct(temp)
+}
+max(mygrid$LevelNumber)  # 16,195 < 47,729
+
+# Let's remove the first column and dedupe:
+names(cl)
+cl <- cl[-1]
+dim(cl) # 48,729 x 32
+cl <- unique(cl)
+dim(cl)  # 16,241 by 31 - WOW, we shortened our file by 66%
+# Let's remove timestamp and dedupe:
+cl <- cl %>% select(-timestamp)
+cl <- unique(cl)
+dim(cl) # 16,200
+# Let's remove impId and dedupe
+cl <- cl %>% select(-impId)
+cl <- unique(cl)
+dim(cl) # 16,195
+
+mygrid <- expand.grid(c("ad", "bidPrice", "campaign", "day", "dimensions", "bestVenueName"), 
+                      c("ad", "bidPrice", "campaign", "day", "dimensions", "bestVenueName"), stringsAsFactors = F)
+mygrid <- filter(mygrid, !(Var1 == Var2))
+mygrid$LevelNumber <- NA
+for (i in 1:nrow(mygrid)) {
+  temp <- paste(cl[[mygrid$Var1[i]]], cl[[mygrid$Var2[i]]],sep = '_')
+  mygrid$LevelNumber[i] <- n_distinct(temp)
+}
+max(mygrid$LevelNumber)  # 16,195 = 16,195 - uniquely identified by ad & dimesnsions or bidPrice & dimensions or even day & dimensions
+
+# Looking at rows with double entries:
+dim_frequent <- count(cl, dimensions) %>% arrange(-n) %>% 
+  filter(n > 1) %>% select(dimensions) # %>% unlist()
+# View(dim_frequent)
+write.csv(cl[cl$dimensions %in% dim_frequent$dimensions,], "x temp.csv", row.names = F)
+
+# Summary:
+
+# To achive uniqueness in "impressions", one needs to remove:
+# Unnamed column, timestamp, auctionId and then use dimensions + price (actual price paid)
+# dimensions + bidPrice don't produce uniqueness nor do dimensions + ad (althought they should) nor
+# dimensions + campaign
+# Unfortunately, we can't find unique IDs based on columns in-common with click data file because the final prices paid
+# are sometimes different (for those 2 ads that are shown at the same time (or almost the same) and sold on the same or
+# different auctions and show exactly the same ads, but are sold separately - as a result, they either:
+# have the same timestamp, but are purchased on different aucionts, or have different timestaps (within seconds from each other), 
+# but are bought on the same auction, or have the same time stamp and auction, but different final prices
+
+# To achieve uniqueness in "clicks" one needs to remove:
+# Unnamed column, timestamp, impId (impressionId) and then use dimensions + ad or bidPrice & dimensions)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
